@@ -1,50 +1,66 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
-from typing import List, Optional
+# Digital Twin for Manufacturing
 
-app = FastAPI()
+This project is a starter kit for a digital twin in a manufacturing use-case. It includes a FastAPI backend, a simulator, a frontend dashboard, and a Docker setup to run everything.
 
-class DigitalTwinState(BaseModel):
-    temperature: Optional[float] = None
-    pressure: Optional[float] = None
-    status: Optional[str] = "offline"
+## Components
 
-state = DigitalTwinState()
+### Backend
 
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+A FastAPI application that serves as the core of the digital twin.
+- **REST API:** Exposes endpoints to get and update the twin's state.
+- **WebSocket:** Pushes live telemetry data to connected clients (like the frontend).
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+### Simulator
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+A Python script that mimics sensor data.
+- **`main.py`:** Publishes telemetry data (temperature, pressure) to an MQTT broker.
+- **`mqtt_bridge.py`:** Subscribes to the MQTT topic and forwards the data to the backend's REST API.
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+### Frontend
 
-manager = ConnectionManager()
+A simple HTML dashboard.
+- **`index.html`:** Displays live telemetry data using Chart.js, connected to the backend's WebSocket.
 
-@app.get("/state", response_model=DigitalTwinState)
-def get_state():
-    return state
+### Docker Setup
 
-@app.post("/state", response_model=DigitalTwinState)
-async def update_state(new_state: DigitalTwinState):
-    global state
-    state = new_state
-    await manager.broadcast(state.json())
-    return state
+- **`Dockerfile`:** Each service (`backend`, `simulator`) has its own Dockerfile.
+- **`docker-compose.yml`:** Orchestrates the deployment of all services, including an MQTT broker (Eclipse Mosquitto) and a web server (Nginx) for the frontend.
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # Not doing anything with received data for now
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+## How to Run
+
+1. **Install Docker and Docker Compose.**
+2. **Clone this repository.**
+3. **Run the application:**
+   ```bash
+   docker-compose up --build
+   ```
+4. **Access the components:**
+   - **Frontend Dashboard:** http://localhost:8080
+   - **Backend API:** http://localhost:8000/docs
+
+## Project Structure
+```
+.
+├── backend
+│   ├── Dockerfile
+│   ├── main.py
+│   └── requirements.txt
+├── docker-compose.yml
+├── frontend
+│   └── index.html
+├── README.md
+└── simulator
+    ├── Dockerfile
+    ├── main.py
+    ├── mqtt_bridge.py
+    └── requirements.txt
+```
+
+## Extending the Project
+
+This is a minimal setup. You can extend it by:
+- Adding a database (e.g., Redis, InfluxDB) for persistent storage.
+- Implementing more complex digital twin models.
+- Integrating with other industrial protocols (e.g., OPC-UA).
+- Adding machine learning models for predictive maintenance.
+- Deploying to Kubernetes for a production environment.
