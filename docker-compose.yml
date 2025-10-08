@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+
+  mqtt_broker:
+    image: eclipse-mosquitto:latest
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+  simulator_telemetry:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    depends_on:
+      - mqtt_broker
+    command: ["python", "simulator/main.py"]
+
+  simulator_bridge:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    depends_on:
+      - mqtt_broker
+      - backend
+    command: ["python", "simulator/mqtt_bridge.py"]
+
+  frontend:
+    image: nginx:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend/index.html:/usr/share/nginx/html/index.html
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - backend

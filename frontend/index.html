@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; }
+        .chart-container { width: 50%; margin: auto; }
+        #pinn-output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Digital Twin Dashboard</h1>
+    <div class="chart-container">
+        <canvas id="telemetryChart"></canvas>
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <button id="run-pinn">Run PINN Optimization</button>
+    </div>
+    <div id="pinn-output">
+        <h2>PINN Optimization Results</h2>
+        <pre id="pinn-results"></pre>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        const telemetryChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: [],
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    fill: false
+                }, {
+                    label: 'Pressure (bar)',
+                    data: [],
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'linear',
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        const socket = new WebSocket("ws://localhost:8000/ws");
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const time = new Date();
+            const newLabel = time.toLocaleTimeString();
+
+            telemetryChart.data.labels.push(newLabel);
+            telemetryChart.data.datasets[0].data.push(data.temperature);
+            telemetryChart.data.datasets[1].data.push(data.pressure);
+
+            if (telemetryChart.data.labels.length > 20) {
+                telemetryChart.data.labels.shift();
+                telemetryChart.data.datasets[0].data.shift();
+                telemetryChart.data.datasets[1].data.shift();
+            }
+
+            telemetryChart.update();
+        };
+
+        document.getElementById('run-pinn').addEventListener('click', () => {
+            document.getElementById('pinn-results').textContent = 'Running...';
+            fetch('/api/pinn/optimize', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('pinn-results').textContent = JSON.stringify(data, null, 2);
+                })
+                .catch(error => {
+                    console.error('Error running PINN optimization:', error);
+                    document.getElementById('pinn-results').textContent = 'Error running optimization.';
+                });
+        });
+
+    </script>
+</body>
+</html>
